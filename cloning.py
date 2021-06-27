@@ -16,24 +16,18 @@ def calc_angles(a, b):
     return angle
 
 
-def draw_inner_mask(pts, w, h):
-    mask = np.zeros((h, w))
-    cv2.fillPoly(mask, [np.array(pts).reshape((-1, 1, 2))], 1)
-    mask[pts[:, 1], pts[:, 0]] = 0
-    return mask
-
-
 def in_range(a, a_min, a_max):
     return np.logical_and.reduce((a_min[0] <= a[:, 0], a[:, 0] < a_max[0], a_min[1] <= a[:, 1], a[:, 1] < a_max[1]))
 
 
 # ref: https://github.com/fafa1899/MVCImageBlend/blob/master/ImgViewer/qimageshowwidget.cpp
-def mvc(src, dst, border_pts, offset):
+def mvc(src, dst, mask, offset):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
-    # draw inner_mask
-    inner_mask = draw_inner_mask(border_pts, src.shape[1], src.shape[0])    
+    border_pts = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)    
+    inner_mask = mask
+    inner_mask[border_pts[:, 1], border_pts[:, 0]] = 0
 
     # calculate weight matrix
     nz = np.argwhere(inner_mask > 0)
@@ -70,12 +64,13 @@ def mvc(src, dst, border_pts, offset):
     return dst.astype(np.uint8)
 
 
-def mvc_mesh(src, dst, border_pts, offset):
+def mvc_mesh(src, dst, mask, offset):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
-    # draw inner_mask
-    inner_mask = draw_inner_mask(border_pts, dst.shape[1], dst.shape[0])
+    border_pts = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)    
+    inner_mask = mask
+    inner_mask[border_pts[:, 1], border_pts[:, 0]] = 0
 
     mesh = generate_mesh(border_pts, np.ones_like(src))
 

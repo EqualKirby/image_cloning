@@ -51,12 +51,8 @@ if __name__ == '__main__':
 
                 canvas = np.zeros_like(src)
                 cv2.fillPoly(canvas, [np.array(pts).reshape((-1, 1, 2))], (1, 1, 1))
-
                 canvas[[p[1] for p in pts], [p[0] for p in pts], :] = 0
                 cv2.imshow(wnd, canvas * src)
-
-                print(len(pts))
-                print(canvas.sum().sum().sum() / 3)
 
         cv2.setMouseCallback(wnd, callback)
         cv2.waitKey(0)
@@ -73,7 +69,7 @@ if __name__ == '__main__':
 
     dst = cv2.imread('target.jpg')
     h, w, c = dst.shape
-    res = mvc(src, dst, pts, (456 + 300 * 1, 326))
+    res = mvc(src, dst, inner_mask, (456 + 300 * 1, 326))
 
     output_wnd = 'result'    
     cv2.namedWindow(output_wnd)
