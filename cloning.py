@@ -21,31 +21,34 @@ def in_range(a, a_min, a_max):
 
 
 # ref: https://github.com/fafa1899/MVCImageBlend/blob/master/ImgViewer/qimageshowwidget.cpp
-def mvc(src, dst, mask, offset):
+def mvc(src, dst, mask, offset, L=None, get_L=False):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
     border_pts = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)    
-    inner_mask = mask
+    inner_mask = mask.copy()
     inner_mask[border_pts[:, 1], border_pts[:, 0]] = 0
+
 
     # calculate weight matrix
     nz = np.argwhere(inner_mask > 0)
-    L = np.zeros((len(nz), len(border_pts) - 1))
 
-    a = border_pts[0:-1, :]
-    b = border_pts[1:, :]
+    if L is None:
+        L = np.zeros((len(nz), len(border_pts) - 1))
 
-    for i, (r, c) in enumerate(nz):        
-        cur = np.array([c, r])
-        angles = calc_angles(a - cur, b - cur)
-        tan_val = np.tan(angles / 2)
+        a = border_pts[0:-1, :]
+        b = border_pts[1:, :]
 
-        ta = np.hstack((tan_val[-1], tan_val[0:-1]))
-        tb = tan_val
-        w = (ta + tb) / norm(a - cur)
-        w = w / np.sum(w)
-        L[i, :] = w
+        for i, (r, c) in enumerate(nz):        
+            cur = np.array([c, r])
+            angles = calc_angles(a - cur, b - cur)
+            tan_val = np.tan(angles / 2)
+
+            ta = np.hstack((tan_val[-1], tan_val[0:-1]))
+            tb = tan_val
+            w = (ta + tb) / norm(a - cur)
+            w = w / np.sum(w)
+            L[i, :] = w
 
     dx, dy = offset
 
@@ -56,15 +59,22 @@ def mvc(src, dst, mask, offset):
 
     # calculate final result
     interior_idx = in_range(nz + [dy, dx], (0, 0), (dst.shape[0], dst.shape[1]))
-    y, x = nz[:, 0][interior_idx], nz[:, 1][interior_idx]    
-    val = L[interior_idx, :][:, border_idx] @ diff
+    y, x = nz[:, 0][interior_idx], nz[:, 1][interior_idx]
+
+    M = L[interior_idx, :][:, border_idx]
+    M = M / np.sum(M, axis=1).reshape(-1, 1)
+    val = M @ diff
     dst[y + dy, x + dx, :] = src[y, x, :] + val
 
     dst = np.clip(0, dst, 255)
-    return dst.astype(np.uint8)
+
+    if get_L:
+        return dst.astype(np.uint8), L
+    else:
+        return dst.astype(np.uint8)
 
 
-def mvc_mesh(src, dst, mask, offset):
+def mvc_mesh(src, dst, mask, offset, get_L=False):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
@@ -75,7 +85,11 @@ def mvc_mesh(src, dst, mask, offset):
     mesh = generate_mesh(border_pts, np.ones_like(src))
 
     dst = np.clip(0, dst, 255)
-    return dst.astype(np.uint8)    
+
+    if get_L:
+        return dst.astype(np.uint8), 0
+    else:
+        return dst.astype(np.uint8)
 
 
 def generate_mesh(pts, wireframe=None):

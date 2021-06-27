@@ -25,7 +25,7 @@ if __name__ == '__main__':
         pts = []
         drawing = False
 
-        def callback(event, x, y, flags, param):
+        def draw_callback(event, x, y, flags, param):
             global drawing, canvas, pts
 
             x = np.clip(x, 0, w - 1)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
                 canvas[[p[1] for p in pts], [p[0] for p in pts], :] = 0
                 cv2.imshow(wnd, canvas * src)
 
-        cv2.setMouseCallback(wnd, callback)
+        cv2.setMouseCallback(wnd, draw_callback)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -69,10 +69,23 @@ if __name__ == '__main__':
 
     dst = cv2.imread('target.jpg')
     h, w, c = dst.shape
-    res = mvc(src, dst, inner_mask, (456 + 300 * 1, 326))
+    res, L = mvc(src, dst, inner_mask, (456 + 300 * 0, 326), get_L=True)
 
     output_wnd = 'result'    
     cv2.namedWindow(output_wnd)
     cv2.resizeWindow(output_wnd, w, h)
     cv2.imshow(output_wnd, res)
+
+    def output_callback(event, x, y, flags, param):
+        global L
+
+        x = np.clip(x, 0, w - 1)
+        y = np.clip(y, 0, h - 1)
+
+        if event == cv2.EVENT_LBUTTONDOWN:
+            res = mvc(src, dst, inner_mask, (x, y), L)
+            cv2.imshow(output_wnd, res)
+
+    cv2.setMouseCallback(output_wnd, output_callback)
     cv2.waitKey(0)
+    cv2.destroyAllWindows()
