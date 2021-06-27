@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 from skimage.draw import line
-from cloning import mvc
+from cloning import mvc, mvc_mesh
 
 
 def get_points_in_line(start, end):
@@ -11,7 +11,7 @@ def get_points_in_line(start, end):
 
 if __name__ == '__main__':
     wnd = 'Draw the region'
-    skip_drawing = False
+    skip_drawing = True
 
     src = cv2.imread('source.jpg')
     h, w, c = src.shape
@@ -71,10 +71,9 @@ if __name__ == '__main__':
         pts = np.load('border.npy')
         inner_mask = np.load('inner.npy')
 
-    # FIXME: out of boundary 
     dst = cv2.imread('target.jpg')
     h, w, c = dst.shape
-    res = mvc(src, dst, pts, inner_mask, (456, 326))
+    res = mvc(src, dst, pts, (456 + 300 * 1, 326))
 
     output_wnd = 'result'    
     cv2.namedWindow(output_wnd)
