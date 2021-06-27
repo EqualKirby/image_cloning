@@ -3,6 +3,9 @@ import cv2
 import triangle as tr
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import glfw
 
 
 def norm(a):
@@ -22,7 +25,7 @@ def in_range(a, a_min, a_max):
 
 
 # ref: https://github.com/fafa1899/MVCImageBlend/blob/master/ImgViewer/qimageshowwidget.cpp
-def mvc(src, dst, mask, offset, L=None, get_L=False):
+def mvc(src, dst, mask, offset, state=None, get_state=False):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
@@ -33,7 +36,7 @@ def mvc(src, dst, mask, offset, L=None, get_L=False):
     # calculate weight matrix
     nz = np.argwhere(inner_mask > 0)
 
-    if L is None:
+    if state is None:
         L = np.zeros((len(nz), len(border_pts) - 1))
 
         a = border_pts[0:-1, :]
@@ -49,6 +52,8 @@ def mvc(src, dst, mask, offset, L=None, get_L=False):
             w = (ta + tb) / norm(a - cur)
             w = w / np.sum(w)
             L[i, :] = w
+    else:
+        L = state
 
     dx, dy = offset
 
@@ -67,26 +72,26 @@ def mvc(src, dst, mask, offset, L=None, get_L=False):
 
     dst = np.clip(0, dst, 255)
 
-    if get_L:
+    if get_state:
         return dst.astype(np.uint8), L
     else:
         return dst.astype(np.uint8)
 
 
-def mvc_mesh(src, dst, mask, offset, L=None, get_L=False):
+def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
     border_pts = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)
-    inner_mask = mask
+    inner_mask = mask.copy()
     inner_mask[border_pts[:, 1], border_pts[:, 0]] = 0
 
-    inner_border_pts = cv2.findContours(inner_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)
-    mesh = generate_mesh(inner_border_pts, np.ones_like(src))
-    vertices = mesh['vertices']
-
     # calculate weight matrix
-    if L is None:
+    if state is None:
+        inner_border_pts = cv2.findContours(inner_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)
+        mesh = generate_mesh(inner_border_pts, np.ones_like(src))
+        vertices = mesh['vertices']
+
         L = np.zeros((len(vertices), len(border_pts) - 1))
 
         a = border_pts[0:-1, :]
@@ -107,6 +112,9 @@ def mvc_mesh(src, dst, mask, offset, L=None, get_L=False):
             w = (ta + tb) / norm(a - cur)
             w = w / np.sum(w)
             L[i, :] = w
+    else:
+        L = state[0]
+        mesh = state[1]
 
     dx, dy = offset
 
@@ -116,29 +124,66 @@ def mvc_mesh(src, dst, mask, offset, L=None, get_L=False):
     diff = dst[y + dy, x + dx, :] - src[y, x, :]
 
     base = L @ diff
-    print(L)
+    diff_map = interpolation(mesh, base, offset, dst.shape[1], dst.shape[0], base.min(), base.max() - base.min())
 
-    triang = mtri.Triangulation(mesh['vertices'][:, 1], mesh['vertices'][:, 0], triangles=mesh['triangles'])
-    interp0 = mtri.LinearTriInterpolator(triang, base[:, 0])
-    interp1 = mtri.LinearTriInterpolator(triang, base[:, 1])
-    interp2 = mtri.LinearTriInterpolator(triang, base[:, 2])
-    plt.triplot(triang)
-    plt.show()
-
-    nz = np.argwhere(inner_mask > 0)
+    nz = np.argwhere((diff_map != diff_map.max()).all(axis=2))
     for r, c in nz:
-        if 0 <= r + dy and r + dy < dst.shape[0] and 0 <= c + dx and c + dx < dst.shape[1]:
-            a0 = float(interp0(r, c)) or 0
-            a1 = float(interp1(r, c)) or 0
-            a2 = float(interp2(r, c)) or 0
-            dst[r + dy, c + dx] = src[r, c] + np.array([a0, a1, a2])
+        if 0 <= r - dy and r - dy < src.shape[0] and 0 <= c - dx and c - dx < src.shape[1]:
+            dst[r, c] = src[r - dy, c - dx] + diff_map[r, c]
 
     dst = np.clip(0, dst, 255)
 
-    if get_L:
-        return dst.astype(np.uint8), 0
+    if get_state:
+        return dst.astype(np.uint8), (L, mesh)
     else:
         return dst.astype(np.uint8)
+
+
+def interpolation(mesh, base, offset, w, h, shift, scale):
+    magic = 0.98
+
+    glClearColor(1, 1, 1, 0)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+    vertices = mesh['vertices'] + offset + np.array([0.5, 0.5])
+    base = (base - shift) / scale * magic
+
+    glBegin(GL_TRIANGLES)
+    for tri in mesh['triangles']:
+        vs = vertices[tri]
+        cs = base[tri]
+
+        glColor3f(*cs[0])
+        glVertex3f(*vs[0], 0)
+        glColor3f(*cs[1])
+        glVertex3f(*vs[1], 0)
+        glColor3f(*cs[2])
+        glVertex3f(*vs[2], 0)
+
+    # glColor3f(1, 0, 0)
+    # glVertex3f(0, 0, 0)
+    # glColor3f(0, 1, 0)
+    # glVertex3f(w, 0, 0)
+    # glColor3f(0, 0, 1)
+    # glVertex3f(0, h, 0)
+
+    # glColor3f(1, 0, 0)
+    # glVertex3f(w, 0, 0)
+    # glColor3f(0, 1, 0)
+    # glVertex3f(w, h, 0)
+    # glColor3f(0, 0, 1)
+    # glVertex3f(0, h, 0)
+    glEnd()
+
+    glReadBuffer(GL_COLOR_ATTACHMENT0)
+    image_buffer = glReadPixels(0, 0, w, h, GL_RGB, GL_FLOAT)
+    image = np.frombuffer(image_buffer, dtype=np.float32).reshape(h, w, 3)
+    image = image * scale / magic + shift
+
+    # cv2.imwrite('test.png', cv2.cvtColor(image * 255, cv2.COLOR_RGB2BGR))
+    # print(image * 255)
+
+    return image
 
 
 def generate_mesh(pts, wireframe=None):
