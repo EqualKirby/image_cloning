@@ -69,23 +69,23 @@ if __name__ == '__main__':
 
     dst = cv2.imread('target.jpg')
     h, w, c = dst.shape
-    res, L = mvc(src, dst, inner_mask, (456 + 300 * 0, 326), get_L=True)
+    res, L = mvc_mesh(src, dst, inner_mask, (456 + 300 * 0, 326), get_L=True)
 
     output_wnd = 'result'    
     cv2.namedWindow(output_wnd)
     cv2.resizeWindow(output_wnd, w, h)
     cv2.imshow(output_wnd, res)
 
-    def output_callback(event, x, y, flags, param):
-        global L
+    # def output_callback(event, x, y, flags, param):
+    #     global L
 
-        x = np.clip(x, 0, w - 1)
-        y = np.clip(y, 0, h - 1)
+    #     x = np.clip(x, 0, w - 1)
+    #     y = np.clip(y, 0, h - 1)
 
-        if event == cv2.EVENT_LBUTTONDOWN:
-            res = mvc(src, dst, inner_mask, (x, y), L)
-            cv2.imshow(output_wnd, res)
+    #     if event == cv2.EVENT_LBUTTONDOWN:
+    #         res = mvc(src, dst, inner_mask, (x, y), L)
+    #         cv2.imshow(output_wnd, res)
 
-    cv2.setMouseCallback(output_wnd, output_callback)
+    # cv2.setMouseCallback(output_wnd, output_callback)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
