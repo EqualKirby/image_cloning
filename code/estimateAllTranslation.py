@@ -102,7 +102,7 @@ def applyGeometricTransformation(startXs, startYs, newXs, newYs, bbox):
     return Xs, Ys, newbbox
 
 if __name__ == "__main__":
-    cap = cv2.VideoCapture("Easy.mp4")
+    cap = cv2.VideoCapture("../video/Easy.mp4")
     ret, frame1 = cap.read()  # get first frame
     ret, frame2 = cap.read()  # get second frame
     ret, frame2 = cap.read()  # get second frame
