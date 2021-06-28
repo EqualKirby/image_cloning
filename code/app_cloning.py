@@ -1,47 +1,16 @@
 import numpy as np
 import cv2
 from skimage.draw import line
-from objectTracking import *
-from cloning import mvc, mvc_mesh
+from cloning import mvc, mvc_mesh, init_opengl
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import glfw
+
 
 def get_points_in_line(start, end):
     x, y = line(*start, *end)
     return x[1:], y[1:]
 
-def init_opengl(w, h):
-    if not glfw.init():
-        raise Error('Cannot initialize glfw')
-        
-    glfw.window_hint(glfw.VISIBLE, False)
-    window = glfw.create_window(w, h, "hidden window", None, None)
-    if not window:
-        raise Error('Failed to create window')
-
-    glfw.make_context_current(window)
-
-    glEnable(GL_TEXTURE_2D)
-    glDisable(GL_BLEND)
-    glDisable(GL_DEPTH_TEST)
-    gluOrtho2D(0, w, 0, h)
-
-    tex = glGenTextures(1)
-    glBindTexture(GL_TEXTURE_2D, tex)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0, GL_RGB, GL_FLOAT, None)
-
-    fbo = glGenFramebuffers(1)
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0)
-    glViewport(0, 0, w, h)
-
-    if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
-        raise RuntimeError('Framebuffer binding failed, probably because your GPU does not support this FBO configuration.')
-
-    return window
 
 if __name__ == '__main__':
     wnd = 'Draw the region'
@@ -101,35 +70,7 @@ if __name__ == '__main__':
         pts = np.load('border.npy')
         inner_mask = np.load('inner.npy')
 
-''' 
-    # Use this part of code to track
-    # FIXME: out of boundary 
-    # dst = cv2.imread('../image/target.jpg')
-    # h, w, c = dst.shape
-    inner_mask = np.dstack([inner_mask]*3) * 255
-    # res = mvc(src, dst, pts, inner_mask, (456, 326))
-
-    n_frame = 100
-    video_path = "../video/easy.mp4"
-    bboxs = objectTracking(video_path, n_frame, play_realtime=True, save_to_file=True)
-
-    cap = cv2.VideoCapture(video_path)
-    w, h = int(cap.get(3)), int(cap.get(4))
-    for frame_idx in range(n_frame):
-        print("synthesis frame #", frame_idx)
-        _, frames = cap.read()
-        center = (int(np.mean(bboxs[frame_idx][:,0])), int(np.mean(bboxs[frame_idx][:,1])))
-        res = cv2.seamlessClone(src, frames, inner_mask, center, cv2.NORMAL_CLONE)
-
-        output_wnd = 'result'
-        cv2.namedWindow(output_wnd)
-        cv2.resizeWindow(output_wnd, w, h)
-        cv2.imshow(output_wnd, res)
-        cv2.waitKey(10)
-
-    cap.release()
-'''
-    dst = cv2.imread('target.jpg')
+    dst = cv2.imread('../image/target.jpg')
     h, w, c = dst.shape
     ogl_wnd = init_opengl(w, h)
     res, state = mvc_mesh(src, dst, inner_mask, (456 + 300 * 0, 326), get_state=True)

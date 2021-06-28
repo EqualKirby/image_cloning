@@ -23,6 +23,8 @@ def in_range(a, a_min, a_max):
 
 
 # ref: https://github.com/fafa1899/MVCImageBlend/blob/master/ImgViewer/qimageshowwidget.cpp
+# ref: https://github.com/pablospe/MVCDemo/blob/master/src/MVCCloner.cpp
+# ref: https://github.com/apwan/MVC
 def mvc(src, dst, mask, offset, state=None, get_state=False):
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
@@ -155,6 +157,39 @@ def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
         return dst.astype(np.uint8), (L, mesh)
     else:
         return dst.astype(np.uint8)
+
+
+def init_opengl(w, h):
+    if not glfw.init():
+        raise Error('Cannot initialize glfw')
+        
+    glfw.window_hint(glfw.VISIBLE, False)
+    window = glfw.create_window(w, h, "hidden window", None, None)
+    if not window:
+        raise Error('Failed to create window')
+
+    glfw.make_context_current(window)
+
+    glEnable(GL_TEXTURE_2D)
+    glDisable(GL_BLEND)
+    glDisable(GL_DEPTH_TEST)
+    gluOrtho2D(0, w, 0, h)
+
+    tex = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, tex)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0, GL_RGB, GL_FLOAT, None)
+
+    fbo = glGenFramebuffers(1)
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0)
+    glViewport(0, 0, w, h)
+
+    if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+        raise RuntimeError('Framebuffer binding failed, probably because your GPU does not support this FBO configuration.')
+
+    return window
 
 
 def interpolation(mesh, base, offset, w, h, shift, scale):
