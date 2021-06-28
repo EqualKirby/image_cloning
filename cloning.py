@@ -79,6 +79,10 @@ def mvc(src, dst, mask, offset, state=None, get_state=False):
 
 
 def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
+    import time 
+
+    t = [time.time()]
+
     src = src.astype(np.float64)
     dst = dst.astype(np.float64)
 
@@ -86,10 +90,12 @@ def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
     inner_mask = mask.copy()
     inner_mask[border_pts[:, 1], border_pts[:, 0]] = 0
 
+    t.append(time.time())
+
     # calculate weight matrix
     if state is None:
         inner_border_pts = cv2.findContours(inner_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)
-        mesh = generate_mesh(inner_border_pts, np.ones_like(src))
+        mesh = generate_mesh(inner_border_pts)
         vertices = mesh['vertices']
 
         L = np.zeros((len(vertices), len(border_pts) - 1))
@@ -116,6 +122,8 @@ def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
         L = state[0]
         mesh = state[1]
 
+    t.append(time.time())
+
     dx, dy = offset
 
     # calculate boundary difference
@@ -123,15 +131,28 @@ def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
     x, y = border_pts[:-1, 0][border_idx], border_pts[:-1, 1][border_idx]
     diff = dst[y + dy, x + dx, :] - src[y, x, :]
 
-    base = L @ diff
+    # calculate value per vertices
+    M = L[:, border_idx]
+    M = M / np.sum(M, axis=1).reshape(-1, 1)
+    base = M @ diff
+    t.append(time.time())
+
+    # interpolation inside each triangles
     diff_map = interpolation(mesh, base, offset, dst.shape[1], dst.shape[0], base.min(), base.max() - base.min())
 
+    t.append(time.time())
+
     nz = np.argwhere((diff_map != diff_map.max()).all(axis=2))
-    for r, c in nz:
-        if 0 <= r - dy and r - dy < src.shape[0] and 0 <= c - dx and c - dx < src.shape[1]:
-            dst[r, c] = src[r - dy, c - dx] + diff_map[r, c]
+    inner_idx = in_range(nz - [dy, dx], (0, 0), (src.shape[0], src.shape[1]))
+    inner = nz[inner_idx]
+    y, x = inner[:, 0], inner[:, 1]
+    dst[y, x] = src[y - dy, x - dx] + diff_map[y, x]
 
     dst = np.clip(0, dst, 255)
+
+    t.append(time.time())
+    t = np.array(t)
+    print(t[-1] - t[0], t[1:] - t[:-1])
 
     if get_state:
         return dst.astype(np.uint8), (L, mesh)
