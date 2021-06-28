@@ -1,3 +1,7 @@
 __pycache__/
+<<<<<<< HEAD
 .DS_Store
 */.DS_Store
+=======
+.vscode/
+>>>>>>> 88a84bd53279be5c14e254e00312165a6851457b
