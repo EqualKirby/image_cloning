@@ -2,8 +2,7 @@ import numpy as np
 import cv2
 from skimage.draw import line
 from cloning import mvc, mvc_mesh, init_opengl
-from OpenGL.GL import *
-from OpenGL.GLU import *
+import sys
 import glfw
 
 
@@ -13,10 +12,17 @@ def get_points_in_line(start, end):
 
 
 if __name__ == '__main__':
-    wnd = 'Draw the region'
-    skip_drawing = True
+    if len(sys.argv) == 3:
+        src_name = sys.argv[1]
+        dst_name = sys.argv[2]
+    else:
+        src_name = '../image/source.jpg'
+        dst_name = '../image/target.jpg'
 
-    src = cv2.imread('../image/source.jpg')
+    wnd = 'Draw the region'
+    skip_drawing = False
+
+    src = cv2.imread(src_name)
     h, w, c = src.shape
 
     if not skip_drawing:
@@ -63,14 +69,14 @@ if __name__ == '__main__':
 
         inner_mask = np.squeeze(canvas[:, :, 0])
         pts = np.array(pts)
-        np.save('border', pts)
-        np.save('inner', inner_mask)
+        # np.save('border', pts)
+        # np.save('inner', inner_mask)
 
     else:
         pts = np.load('border.npy')
         inner_mask = np.load('inner.npy')
 
-    dst = cv2.imread('../image/target.jpg')
+    dst = cv2.imread(dst_name)
     h, w, c = dst.shape
     ogl_wnd = init_opengl(w, h)
     res, state = mvc_mesh(src, dst, inner_mask, (456 + 300 * 0, 326), get_state=True)
@@ -83,8 +89,8 @@ if __name__ == '__main__':
     def output_callback(event, x, y, flags, param):
         global state
 
-        x = np.clip(x, 0, w - 1)
-        y = np.clip(y, 0, h - 1)
+        x = np.clip(x - src.shape[1] // 2, 0, w - 1)
+        y = np.clip(y - src.shape[0] // 2, 0, h - 1)
 
         if event == cv2.EVENT_LBUTTONDOWN:
             res = mvc_mesh(src, dst, inner_mask, (x, y), state)

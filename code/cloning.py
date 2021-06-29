@@ -6,6 +6,7 @@ import matplotlib.tri as mtri
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import glfw
+import time
 
 def norm(a):
     return np.sqrt(np.sum(a * a, 1))
@@ -79,8 +80,6 @@ def mvc(src, dst, mask, offset, state=None, get_state=False):
 
 
 def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
-    import time 
-
     t = [time.time()]
 
     src = src.astype(np.float64)
@@ -95,7 +94,7 @@ def mvc_mesh(src, dst, mask, offset, state=None, get_state=False):
     # calculate weight matrix
     if state is None:
         inner_border_pts = cv2.findContours(inner_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0].reshape(-1, 2)
-        mesh = generate_mesh(inner_border_pts)
+        mesh = generate_mesh(inner_border_pts, np.ones((src.shape[0], src.shape[1])))
         vertices = mesh['vertices']
 
         L = np.zeros((len(vertices), len(border_pts) - 1))
@@ -231,10 +230,9 @@ def interpolation(mesh, base, offset, w, h, shift, scale):
     glReadBuffer(GL_COLOR_ATTACHMENT0)
     image_buffer = glReadPixels(0, 0, w, h, GL_RGB, GL_FLOAT)
     image = np.frombuffer(image_buffer, dtype=np.float32).reshape(h, w, 3)
-    image = image * scale / magic + shift
+    # cv2.imshow('interpolant', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-    # cv2.imwrite('test.png', cv2.cvtColor(image * 255, cv2.COLOR_RGB2BGR))
-    # print(image * 255)
+    image = image * scale / magic + shift
 
     return image
 
@@ -252,7 +250,6 @@ def generate_mesh(pts, wireframe=None):
         pos = np.round(pos).astype(np.int)
         tri = pos.reshape(len(idx) // 3, -1, 1, 2)
         cv2.polylines(wireframe, tri, True, (0, 0, 0))
-        cv2.imshow('test', wireframe * 255)
-        cv2.waitKey(0)
+        cv2.imshow('wireframe', wireframe * 255)
 
     return res
